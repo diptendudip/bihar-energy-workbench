@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {cases,policies,SCHEMA,activePolicies,makeAnswer,reviewCorrection,initialState,classifyQuestion,metrics,filterCases,escapeHTML} from './public/demo-core.mjs';
 import {sourceStories} from './public/cgnet-cases.mjs';
+import {lookupAnswer} from './public/real-world.mjs';
+import {createRealWorldUI} from './public/real-world-ui.mjs';
 import {caseProfiles,actionPlans,workflowFor,caseStatus,closureReady,assignCase,saveActionDraft,recordStep,recordUpdate,closeCase,reopenCase,actionDraft,isOverdue} from './public/officer-workflow.mjs';
 
 // Each fictional adaptation has one reviewed original-story reference. Story
@@ -122,6 +124,38 @@ assert.equal(workflowFor(rejectedState,billingCase).evidence.length,0);
 assert.equal(workflowFor(rejectedState,billingCase).audit[0].decision,'rejected');
 assert.equal(caseStatus(officer,cases.find(c=>c.id==='DEMO-1048')),'resolved');
 console.log('PASS: fictional identity/address records, assignment, draft boundaries, evidence requirements, manual closure, reopening, overdue dates and status-aware search.');
+
+// Previously saved responses may contain a stale status alongside a historical
+// live flag. Neither language may display that combination as live verified.
+const freshnessState=initialState(),freshnessToasts=[];
+const staleAnswer={...lookupAnswer(example,{question:'Which office?'}),answerId:'STALE-CHECK',directoryStatus:'stale',liveVerified:true};
+const staleRoute={...staleAnswer.route,directoryStatus:'stale',liveVerified:true};
+freshnessState.officeRoutes={[example.id]:{result:staleRoute}};
+let freshnessLanguage='en';
+const freshnessUI=createRealWorldUI({
+ cases,getState:()=>freshnessState,t:(en,hi)=>freshnessLanguage==='hi'?hi:en,
+ e:value=>escapeHTML(typeof value==='object'?(value[freshnessLanguage]??value.en):value),H:escapeHTML,
+ button:()=>'',render(){},toast:text=>freshnessToasts.push(text)
+});
+for(const lang of ['en','hi']){
+ freshnessLanguage=lang;
+ const rendered=freshnessUI.answerHTML(staleAnswer,example);
+ assert.ok(rendered.includes(lang==='en'?'Saved contacts · refresh failed':'सहेजे संपर्क · रिफ्रेश विफल'));
+ assert.ok(!rendered.includes(lang==='en'?'Live website verified':'लाइव वेबसाइट से जाँच'));
+ assert.ok(freshnessUI.casePanel(example).includes(lang==='en'?'Refresh failed. Retained contacts may be stale':'रिफ्रेश नहीं हुआ। पुराने संपर्क हो सकते हैं'));
+ assert.ok(freshnessUI.answerHTML({...staleAnswer,directoryStatus:'live'},example).includes(lang==='en'?'Live website verified':'लाइव वेबसाइट से जाँच'));
+}
+freshnessLanguage='en';
+const originalFetch=globalThis.fetch;
+try{
+ globalThis.fetch=async()=>Response.json(staleRoute);
+ await freshnessUI.click('rw-refresh',{id:example.id});
+ assert.equal(freshnessToasts.at(-1),'Live verification was incomplete. Check the linked source.');
+ globalThis.fetch=async()=>{throw new Error('test connection outage');};
+ await freshnessUI.click('rw-refresh',{id:example.id});
+ assert.equal(freshnessState.officeRoutes[example.id].result.liveVerified,false);
+}finally{globalThis.fetch=originalFetch;}
+console.log('PASS: bilingual stale-source labels and refresh feedback never claim live verification.');
 
 // Render/handler integration in a minimal DOM fixture. This checks application
 // behavior without claiming browser layout or browser API compatibility QA.

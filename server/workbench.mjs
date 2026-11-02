@@ -13,7 +13,7 @@ export function aiConfiguration(env={}){
 }
 export async function currentDirectory(company,force=false,fetcher=fetch){
  const prior=cache.get(company);
- if(prior&&Date.now()-prior.fetchedAt<3600000&&!force)return prior;
+ if(prior?.status==='live'&&Date.now()-prior.fetchedAt<3600000&&!force)return prior;
  const url=company==='NBPDCL'?'https://www.nbpdcl.co.in/frmHelplineNumbers.aspx':'https://www.sbpdcl.co.in/frmHelplineNumbers.aspx';
  try{
   const response=await fetcher(url,{headers:{'User-Agent':'BiharEnergyGrievanceWorkbench/1.0 (+https://bihar-energy-workbench.diptendudip.chatgpt.site)','Accept':'text/html'},signal:AbortSignal.timeout(10000)});
@@ -23,7 +23,13 @@ export async function currentDirectory(company,force=false,fetcher=fetch){
   if(result.verifiedCount<10)throw new Error('directory_format_unrecognized');
   const entry={...result,fetchedAt:Date.now(),status:'live',source:url};cache.set(company,entry);return entry;
  }catch{
-  return {records:prior?.records??directory,status:prior?'stale':'snapshot',fetchedAt:prior?.fetchedAt??null,source:url,verifiedCount:0,error:'directory_unavailable'};
+  // Keep the last checked date and contact values, but revoke current live
+  // verification after a failed refresh. A later answer must not reuse the
+  // previous successful cache entry as though that failure never happened.
+  const records=(prior?.records??directory).map(o=>o.company===company?{...o,liveVerified:false}:o);
+  const entry={records,status:prior?'stale':'snapshot',fetchedAt:prior?.fetchedAt??null,source:url,verifiedCount:0,error:'directory_unavailable'};
+  if(prior)cache.set(company,entry);
+  return entry;
  }
 }
 async function modelAnswer(answer,c,question,lang,env,fetcher){
@@ -59,7 +65,7 @@ export async function handleAPI(request,env={},fetcher=fetch){
   if(typeof body.address!=='string'||body.address.length>300||typeof body.district!=='string'||body.district.length>80)return json({error:'invalid_address'},400);
   let route=routeAddress(body),entry;
   if(route.company&&body.refresh){entry=await currentDirectory(route.company,true,fetcher);route=routeAddress(body,entry.records);}
-  return json({...route,directoryStatus:entry?.status??'snapshot',liveVerified:route.candidates.length>0&&route.candidates.every(x=>x.liveVerified===true),refreshedAt:entry?.fetchedAt?new Date(entry.fetchedAt).toISOString():null});
+  return json({...route,directoryStatus:entry?.status??'snapshot',liveVerified:entry?.status==='live'&&route.candidates.length>0&&route.candidates.every(x=>x.liveVerified===true),refreshedAt:entry?.fetchedAt?new Date(entry.fetchedAt).toISOString():null});
  }
  if(path==='/api/geocode'){
   // Public locality names only. Case names, phone numbers and household addresses
@@ -88,9 +94,9 @@ export async function handleAPI(request,env={},fetcher=fetch){
  const entry=await currentDirectory(answer.route.company,false,fetcher);
  answer=lookupAnswer(c,{question:body.question,mode:body.mode??'question'},entry.records);
  answer.directoryStatus=entry.status;
- answer.liveVerified=answer.route.candidates.length>0&&answer.route.candidates.every(x=>x.liveVerified===true);
- const verifiedDates=answer.route.candidates.filter(x=>x.liveVerified).map(x=>x.checkedAt);
- if(verifiedDates.length)answer.sources[0].checkedAt=verifiedDates[0];
+ answer.liveVerified=entry.status==='live'&&answer.route.candidates.length>0&&answer.route.candidates.every(x=>x.liveVerified===true);
+ const checkedDates=answer.route.candidates.map(x=>x.checkedAt).filter(Boolean);
+ if(checkedDates.length)answer.sources[0].checkedAt=checkedDates[0];
  if(aiConfiguration(env).connected){
   try{answer=await modelAnswer(answer,c,body.question||body.mode,body.lang,env,fetcher);}catch{answer.aiError='model_unavailable_or_invalid';}
  }

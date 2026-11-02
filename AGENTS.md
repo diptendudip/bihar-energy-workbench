@@ -1,21 +1,23 @@
-# Working on Bihar Energy Grievance Workflow
+# Contributing to Bihar Energy Grievance Workbench
 
-This folder is a discovery brief produced in Kitchenlab. Read README.md first.
+Read [README.md](README.md) for setup, [docs/architecture.md](docs/architecture.md) for the current implementation, and [docs/roadmap.md](docs/roadmap.md) for product requirements and open decisions.
 
-## Rules
+## Code and checks
 
-- Read README.md, the station notes and OPEN-QUESTIONS.md together. Notes can contain both explicit agreements and unresolved details; their heading, location or prompt coverage does not establish that they are settled.
-- Preserve explicit agreements, including conditions, prohibitions and approval requirements. Do not reopen an agreement merely because another detail in the same note is unresolved.
-- Any detail described as unknown, undecided, deferred or left for later remains open wherever it appears. A decision to postpone is not a decision about the answer. Never invent an answer or treat uncertainty as permission.
-- Respect a user's choice to leave a question aside: continue independent work. Ask the user before implementing behavior that depends on the unresolved answer; keep existing restrictions in force until they explicitly change them.
-- OPEN-QUESTIONS.md includes unanswered discovery prompts, decisions recorded as still open, and recorded context to review for explicit unresolved details. Its context notes are not all unanswered questions. Preserve known facts and identify only the unresolved parts.
-- Unresolved stations still need a decision. They have not been intentionally excluded from scope.
-- Review the open questions for implementation and release blockers, including safety, data handling, dependencies and operations. Prompt coverage alone does not establish readiness to ship.
-- Recommended roles describe capabilities; one person may cover several.
-- Use the product vocabulary in the brief. Keep Kitchenlab's station labels out of the product unless they belong to its domain.
+- Browser code and fictional fixtures: `public/`.
+- API logic: `server/workbench.mjs`; framework routes: `app/`.
+- Public source snapshots and attribution: `evidence/`; directory generator: `scripts/build-directory.py`.
+- Run `node checks.mjs` and `node server-checks.mjs` after workflow, fixture, lookup or API changes. These checks need no package installation.
+- Use the Node and pnpm versions in `package.json`; run `pnpm dev` for development and `pnpm build` for a production bundle.
+- Keep Hindi and English behavior aligned. Preserve source links, attribution and third-party notices.
 
-## Suggested first turn
+## Product constraints
 
-1. Summarise the explicit agreements, preserving their qualifications.
-2. List explicit unresolved or deferred decisions separately from unanswered discovery prompts; identify which ones block the next implementation step.
-3. Propose work supported by the agreements. Respect deferred questions and ask for a decision only before the affected implementation depends on it.
+- This is a prototype with fictional complaints and sample policy documents. Do not present demo observations as measured outcomes or sample guidance as official policy.
+- Officers decide cases. Suggestions remain read-only; drafts do not send messages or alter government records. Preserve evidence review and explicit human closure confirmation.
+- Corrections require higher-officer or peer review before reuse. The current role switch is a local demonstration, not production access control.
+- Public directory matches and map points do not establish service boundaries. Preserve jurisdiction confirmation and honest snapshot/stale/error states.
+- Government complaint records must stay in a government-approved environment, including during prototyping and AI processing. Do not send them to an outside AI company. Government data remains government-owned; this repository must not contain real complaint records.
+- Keep credentials server-side and out of Git. Leave the model adapter disabled unless the required deployment approval and approved internal gateway configuration exist. A configuration flag does not itself establish institutional approval.
+- Production data access, retention, identity, policy verification, operating ownership and funding remain open as recorded in the roadmap. Do not imply that they have been approved or supplied.
+- `.openai/hosting.json` identifies the existing hosted project. Preserve it for this project; do not reuse its identity for a separate deployment.

@@ -76,5 +76,47 @@ const gatewayFetch=async(url,options)=>{
 response=await handleAPI(req('/api/answer',{caseId:'DEMO-1042',question:'Which office?',lang:'en'}),approvedEnv,gatewayFetch);data=await response.json();assert.equal(data.engine,'government_model');assert.equal(modelCalls,1);
 const invalidGateway=async(url)=>{if(String(url)!==approvedEnv.GOVERNMENT_AI_ENDPOINT)throw new Error('directory outage');return Response.json({choices:[{message:{content:JSON.stringify({sections:[{heading:'Unsupported policy',text:'Invented rule',sourceIds:['INVENTED-REFERENCE']}]})}}]});};
 response=await handleAPI(req('/api/answer',{caseId:'DEMO-1042',question:'Which rule?'}),approvedEnv,invalidGateway);data=await response.json();assert.equal(data.engine,'verified_lookup');assert.ok(data.aiError);assert.ok(!JSON.stringify(data.sections).includes('Invented rule'));
+
+// A failed refresh after a successful one must retain usable contacts and their
+// historical check date without presenting them as currently live verified.
+const directoryFixture=phone=>'<table>'+directory.filter(o=>o.company==='SBPDCL').map(o=>
+ `<tr><td>${o.role}</td><td>${o.posting}</td><td>${o.posting==='ESS, Simri'&&o.role==='JEE'?phone:o.phone}</td></tr>`
+).join('')+'</table>';
+const fixtureFetch=phone=>async()=>new Response(directoryFixture(phone));
+const resolveRequest=()=>req('/api/resolve',{address:'Simri',district:'Buxar',refresh:true});
+const answerRequest=()=>req('/api/answer',{caseId:'DEMO-1042',question:'Which office is responsible?'});
+response=await handleAPI(resolveRequest(),{},fixtureFetch('9999999999'));data=await response.json();
+assert.equal(data.directoryStatus,'live');assert.equal(data.liveVerified,true);
+assert.equal(data.candidates[0].phone,'9999999999');
+const lastCheckedAt=data.candidates[0].checkedAt,lastRefreshedAt=data.refreshedAt;
+assert.ok(Number.isFinite(Date.parse(lastCheckedAt)));
+
+response=await handleAPI(resolveRequest(),{},failFetch);data=await response.json();
+assert.equal(data.directoryStatus,'stale');assert.equal(data.liveVerified,false);
+assert.equal(data.candidates[0].phone,'9999999999');
+assert.equal(data.candidates[0].checkedAt,lastCheckedAt);
+assert.equal(data.refreshedAt,lastRefreshedAt);
+assert.ok([...data.candidates,...data.supervisors].every(o=>o.liveVerified===false));
+
+response=await handleAPI(answerRequest(),{},failFetch);data=await response.json();
+assert.equal(data.directoryStatus,'stale');assert.equal(data.liveVerified,false);
+assert.equal(data.route.candidates[0].phone,'9999999999');
+assert.equal(data.route.candidates[0].checkedAt,lastCheckedAt);
+assert.equal(data.sources.find(s=>s.id==='DIRECTORY').checkedAt,lastCheckedAt);
+assert.ok([...data.route.candidates,...data.route.supervisors].every(o=>o.liveVerified===false));
+
+// Answer lookup retries a stale source; recovery restores live verification and
+// uses the newly returned contact rather than the previously cached value.
+response=await handleAPI(answerRequest(),{},fixtureFetch('8888888888'));data=await response.json();
+assert.equal(data.directoryStatus,'live');assert.equal(data.liveVerified,true);
+assert.equal(data.route.candidates[0].phone,'8888888888');
+assert.equal(data.route.candidates[0].liveVerified,true);
+assert.equal(data.sources.find(s=>s.id==='DIRECTORY').checkedAt,data.route.candidates[0].checkedAt);
+response=await handleAPI(resolveRequest(),{},failFetch);data=await response.json();
+assert.equal(data.directoryStatus,'stale');assert.equal(data.liveVerified,false);
+response=await handleAPI(resolveRequest(),{},fixtureFetch('9999999999'));data=await response.json();
+assert.equal(data.directoryStatus,'live');assert.equal(data.liveVerified,true);
+assert.equal(data.candidates[0].phone,'9999999999');
+console.log('PASS: successful directory refresh, cached-source outage, historical dates, stale answers and recovery through both APIs.');
 console.log('PASS: jurisdiction ambiguity, Hindi queries, current contact refresh, source outages, geocoder privacy and state filtering, model approval gate, citation validation and human-control boundaries.');
 console.log('Live hosted model and government case-system integration remain unconfigured; test gateway responses are fixtures.');

@@ -1,89 +1,65 @@
 # Bihar Energy Grievance Workbench
 
-A bilingual, officer-led electricity grievance workbench for Bihar. It brings case background, public-office lookup, follow-up drafts and evidence tracking into one interface, while keeping decisions and actions with a human officer.
+An English/Hindi prototype for electricity-grievance follow-up in Bihar. Officers can review a case, find candidate service offices, prepare a request and track the evidence needed for a decision.
 
-**[Live demonstration](https://cgnet.in/biharenergy/)** · **[Sites-hosted demonstration](https://bihar-energy-workbench.diptendudip.chatgpt.site)**
+[Open the demo](https://cgnet.in/biharenergy/) · [Sites-hosted demo](https://bihar-energy-workbench.diptendudip.chatgpt.site)
 
-## What the code does
+## Workflow
 
-- English and Hindi case review, search and workflow navigation.
-- Eight fictional complaint scenarios, with links to the public CGNet Swara stories that inspired their themes.
-- Office lookup across Bihar's 38 districts using a snapshot of 1,399 public SBPDCL/NBPDCL contact records, with source links and optional server-side refresh.
-- Human-led assignment, editable request drafts, evidence entry, follow-up, manual closure and reopening.
-- Review of corrections before they can inform subsequent local answers.
-- Optional public-locality mapping with OpenStreetMap attribution.
-- A disabled-by-default adapter for a government-approved internal AI gateway, including citation-ID validation and fallback to labelled source lookup.
+1. Review the complaint, location, service reference and case history.
+2. Look up candidate offices in the SBPDCL/NBPDCL public directories and confirm jurisdiction.
+3. Assign the next step, prepare an editable request and record findings or follow-up.
+4. Review evidence and the complainant's response before manually closing or reopening the case.
 
-## Current boundaries
+The interface supports English and Hindi. Drafts remain unsent, and case actions require an explicit form submission. Corrections have a separate review step.
 
-The cases and sample policy documents are fictional. Public contact records are source snapshots; matching a locality does not establish an official electricity service boundary. Officers must confirm jurisdiction. Drafting, saving and copying do not send a request or modify a government record. Rehearsal activity is stored in the browser tab.
+## Status
 
-No government case system or live language model is connected by default. The hosted demonstration has not been established as a government-approved environment for real complaint processing. The internal AI adapter is implemented, but production model inference and government integration remain unverified. See [IMPLEMENTATION-STATUS.md](IMPLEMENTATION-STATUS.md).
+The prototype includes eight fictional case scenarios and a snapshot of 1,399 official-source contact records across Bihar's 38 districts. Directory refresh, source-backed lookup and public-locality geocoding have server handlers. Locality matches are candidates; the consumer bill or service office must establish the actual service boundary.
 
-## Run the interface without installing dependencies
+Case activity is stored in the browser tab. The reviewer role is a demonstration, and the repository has no connected government case system, shared case database or production officer authentication. An optional internal-model adapter is implemented but disabled by default. The sample policies and policy-search measurements are illustrative.
 
-From this directory, using Python 3:
+[Implementation status](IMPLEMENTATION-STATUS.md) · [Architecture](docs/architecture.md) · [Discovery feedback and validation](docs/validation.md) · [Roadmap](docs/roadmap.md)
+
+## Try locally
+
+For the browser interface, Python 3 is sufficient:
 
 ```sh
 python3 -m http.server 8000 --directory public
 ```
 
-Open <http://localhost:8000>. This serves the browser interface, fictional cases and bundled directory lookup. Server-backed directory refresh, geocoding and optional model inference require the full application below.
+Open <http://localhost:8000>. This mode uses bundled cases and directory records; it does not run the server API.
 
-## Run the full application
-
-Requirements: Node.js 22.13 or later and pnpm 11.25.0 (the version pinned in `package.json`).
+For the full application, use Node.js 22.13 or later and pnpm 11.25.0:
 
 ```sh
 pnpm install --frozen-lockfile
 pnpm dev
 ```
 
-The portable development configuration serves at <http://localhost:5173>. The full app uses Vinext, React, Vite and the Cloudflare Workers runtime. The tracked `.openai/hosting.json` records the existing Sites project identity; it contains no credentials. Do not reuse that identity to publish a separate deployment.
+Open <http://localhost:5173>. Build with `pnpm build`. The application uses Vinext, Vite, React and Cloudflare Workers. The existing Sites identity in `.openai/hosting.json` is deployment metadata; use a separate identity for a new hosted project.
 
-For a production bundle:
+## Run checks
 
-```sh
-pnpm build
-```
-
-## Checks
-
-These existing checks run with Node.js and do not require package installation:
+The checks use Node.js built-ins and require no dependency installation:
 
 ```sh
 node checks.mjs
 node server-checks.mjs
 ```
 
-They exercise source provenance, bilingual interaction flows, correction review, evidence and closure requirements, jurisdiction ambiguity, refresh failures, geocoding restrictions and the model approval/citation gates. Model responses in the server checks are fixtures; passing them does not establish a live integration.
+`npm test` runs both suites. They cover bilingual case interactions, provenance, correction review, evidence requirements, manual closure, directory matching and refresh failures, geocoding restrictions and the optional model adapter. Network and model responses are fixtures in these checks. See [implementation status](IMPLEMENTATION-STATUS.md) for verification limits.
 
-## Source map
+## Configuration
 
-| Path | Purpose |
-| --- | --- |
-| `public/` | Browser UI, case fixtures, officer workflow and source-backed office lookup |
-| `server/workbench.mjs` | API handlers, directory refresh, public-locality geocoding and optional internal-model adapter |
-| `app/` | Vinext routes serving the workbench and its API |
-| `evidence/` | Public-source snapshots and CGNet story provenance |
-| `scripts/build-directory.py` | Regenerates the directory module from reviewed source snapshots |
-| `build/`, `scripts/` | Sites/Vinext build and local-runtime support |
-| `DISCOVERY-BRIEF.md`, `stations/`, `OPEN-QUESTIONS.md` | Original discovery decisions, qualifications and unresolved questions |
+`.env.example` lists the optional internal-model settings. Real complaint data and AI processing require a government-approved environment. Configure `GOVERNMENT_DEPLOYMENT_APPROVED`, `GOVERNMENT_AI_ENDPOINT`, `GOVERNMENT_AI_TOKEN` and `GOVERNMENT_AI_MODEL` only after that arrangement is established. Keep credentials server-side and out of Git.
 
-## Optional AI configuration
+The adapter rejects direct OpenAI, Anthropic and Google API hosts. It checks citation identifiers against supplied evidence; factual support still requires review.
 
-`.env.example` documents setting names with blank credentials. Configure runtime values only after a government-approved deployment and processing arrangement are established:
+## Sources
 
-| Variable | Purpose |
-| --- | --- |
-| `GOVERNMENT_DEPLOYMENT_APPROVED` | Defaults to `false`; explicit approval gate |
-| `GOVERNMENT_AI_ENDPOINT` | Full HTTPS chat-completions URL of the approved internal gateway |
-| `GOVERNMENT_AI_TOKEN` | Server-side credential; never commit its value |
-| `GOVERNMENT_AI_MODEL` | Approved model identifier |
-
-Direct external OpenAI, Anthropic and Google API hosts are rejected by the current adapter. Citation-ID validation checks references against supplied evidence; an officer still has to assess factual correctness.
-
-## Public sources
+The contact snapshot and its provenance are in `public/official-directory.mjs` and `evidence/`. `scripts/build-directory.py` regenerates the module from reviewed source snapshots. CGNet Swara story references document the themes behind the fictional cases.
 
 - [SBPDCL telephone directory](https://www.sbpdcl.co.in/frmHelplineNumbers.aspx)
 - [NBPDCL telephone directory](https://www.nbpdcl.co.in/frmHelplineNumbers.aspx)
@@ -91,4 +67,4 @@ Direct external OpenAI, Anthropic and Google API hosts are rejected by the curre
 - [SBPDCL supply circles](https://www.sbpdcl.co.in/frmCallPowerCut.aspx)
 - [OpenStreetMap / Nominatim usage policy](https://operations.osmfoundation.org/policies/nominatim/)
 
-This is a source export of Sites version 5, source commit `05543d0f7132db4db9c5bd2dd0fea3fe2d434240`, with repository setup documentation added. Third-party notices remain with their respective files.
+Third-party notices remain alongside their respective files.
