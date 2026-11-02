@@ -1,0 +1,26 @@
+# Review of the uploaded brief against the demonstration
+
+Reviewed 9 October 2026 after the user's report that the case files lacked addresses, names and actionable steps.
+
+Sources read together: README.md, AGENTS.md, CLAUDE.md, all nine stations/*.md files, OPEN-QUESTIONS.md and brief.json. The discovery sources remain unchanged. The later user choices authorize an interactive fictional demonstration with simulated AI, CGNet-inspired scenarios, a minimal interface and Hindi/English switching.
+
+The earlier implementation was incomplete as an officer workbench. It covered explanation, citation and correction-review interactions but left case identity/location and practical case administration out of the primary experience. The analytics note about avoiding identifiers in evaluation did not justify omitting operational case-detail fields.
+
+| Requirement or clarification | Implementation and status |
+| --- | --- |
+| Staff and officers understand the complaint and its history (Experience, Knowledge; user clarification) | Eight fictional case narratives, named complainant/representative, address, ward, village, panchayat, block/district, landmark, service/application/asset reference, non-dialable contact placeholder, starting history and new officer action history. |
+| Easy, bilingual web application (Experience, Base Model; subsequent design request) | Minimal list/detail interface with Hindi/English switch; officer Actions tab opens first. Names and addresses are visible before the tabs. |
+| Officer can identify and take the next step (current user clarification; purpose and lifecycle in Menu/Analytics) | Case-specific suggested checklists; manual assignment, responsible staff, follow-up date, editable unsent request, action/finding/reference entry, follow-up/status update, evidence review, manual closure and reopening. The exact steps are fictional demo design, not claimed requirements from an approved government SOP. |
+| Explain policy and case history with sources (Experience, Knowledge, Base Model) | Scripted explanations link to the fictional case record and sample document. Original-case gaps remain identified as starting-record gaps. New officer-entered evidence appears separately and is not claimed to be independently verified. |
+| Check policy/SOP currency (Knowledge) | Current/superseded/unverified checks work within a fictional registry. No real Bihar policy currency has been verified. |
+| The AI must not invent record facts, decide grievances or act for officers (Knowledge, Base Model) | Fictional fixture creation is explicitly labelled. Simulated guidance is read-only. Drafts remain unsent. Only the officer's form submissions record demo workflow changes. Closure has an explicit human confirmation. |
+| Ask another officer and find related examples (Experience) | Editable copy-only colleague/request drafts and related fictional cases. Email, WhatsApp, messaging and case-system integrations remain unconnected. |
+| Human correction review before future use (Experience) | Pending corrections remain excluded until demo reviewer approval; only approved notes inform subsequent scripted answers. This is a role simulation, not production access control or model retraining. |
+| Registration, assignment, first action, follow-up and resolution (Analytics) | Starting case dates plus timestamped new action records, assignees, follow-up dates, status changes and closure/reopen history. Overdue labels use the stated demo review date. These are demonstrations, not pilot outcome measurements. |
+| Evaluation avoids collecting new citizen identifiers (Analytics) | Routine interaction events contain event type, case ID and time. Fictional identity fields stay in the case fixture; they are not added to the evaluation export. Existing illustrative policy-search observations remain explicitly invented. |
+| Images, documents, PDFs and Hindi (Base Model) | Hindi and readable text records are implemented. File upload, PDF/image understanding and OCR are not implemented in this demonstration. |
+| Public Bihar case records and CGNet source research (Knowledge, APIs) | Later user instruction selected fictional CGNet-inspired samples. Eight original CGNet pages have provenance links and publication dates; no original personal details are copied. No real Bihar grievance records or government data have been ingested. |
+| Government data stays in an approved environment (Knowledge, Base Model) | The hosted demonstration contains fiction and public source attribution only. It is not established as a government-approved processing environment. No government-system connection or live AI provider receives grievance records. |
+| Retention, maintenance, accountability, integrations, budgets and funding (open questions) | Remain unresolved for production. Tab-local demo state is not a decision about government retention. No production role assignments, operating commitments or compliance claims have been inferred. |
+
+The demonstration is not the complete production brief. Live integrations, approved government deployment/data access, verified government SOPs and source version governance, real identity/access controls, OCR, retention/accountability decisions, monitoring and operating ownership remain outside the connected demo and unresolved where the brief says so.
