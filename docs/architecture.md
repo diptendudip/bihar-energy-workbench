@@ -32,7 +32,7 @@ The bundled snapshot contains 1,399 contact records across Bihar's 38 districts,
 
 English and Hindi locality matching ranks candidate offices within the selected company. Ambiguous districts, conflicting locations, a PIN alone and out-of-state locations do not establish a service office. The officer confirms the consumer's service area from a bill or office response. Neither a locality name match nor a map point proves jurisdiction.
 
-Server refresh parses current public directory HTML without executing it. It updates a contact when the posting/role has one unambiguous phone match. Missing or conflicting entries remain unverified. Results expose snapshot, stale or live-refresh status; an unavailable source does not become a verified result. Successful directory results are cached in server memory for one hour.
+Server refresh parses current public directory HTML without executing it. It updates a contact when the posting/role has one unambiguous phone match. Missing or conflicting entries remain unverified. Results expose snapshot, stale or live-refresh status; an unavailable source does not become a verified result. Successful directory results are cached in server memory for one hour. Each worker instance shares in-flight refreshes and waits at least 30 seconds between attempts for the same company.
 
 ## API
 
@@ -45,7 +45,7 @@ Server refresh parses current public directory HTML without executing it. It upd
 
 The API rejects unknown case IDs, malformed or oversized requests, unsupported methods and a supplied cross-origin request origin. These checks do not replace production authentication, authorization or operational abuse controls.
 
-Public-locality geocoding is click-triggered. The endpoint rejects numeric, phone-like, household-address, email and URL input; the case workflow supplies a public block/district rather than household details. Nominatim requests use attribution, an identifying user agent, a per-process rate guard and an in-memory cache. Selecting a result opens an attributed OpenStreetMap locality map. These are prototype controls, not a production privacy approval.
+Public-locality geocoding is click-triggered. The endpoint resolves input against known public directory localities, district names and the public blocks in demo cases. It sends only the matched locality and district labels to the map provider. Nominatim requests use attribution, an identifying user agent, a per-process rate guard and an in-memory cache. Selecting a result opens an attributed OpenStreetMap locality map. These are prototype controls, not a production privacy approval.
 
 ## Optional model adapter
 

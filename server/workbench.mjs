@@ -1,7 +1,10 @@
-import {directory,directoryRowsFromHTML,refreshContacts,routeAddress,lookupAnswer,normalize} from '../public/real-world.mjs';
+import {directory,directoryRowsFromHTML,refreshContacts,routeAddress,lookupAnswer,normalize,publicMapLocality} from '../public/real-world.mjs';
 import {cases} from '../public/cgnet-cases.mjs';
 
 const cache=new Map(),geocache=new Map();
+const pendingDirectoryRefreshes=new Map();
+const lastDirectoryAttempt=new Map();
+const DIRECTORY_REFRESH_INTERVAL_MS=30_000;
 let lastGeocode=0;
 const json=(data,status=200)=>Response.json(data,{status,headers:{'Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}});
 const message=(en,hi)=>({en,hi});
@@ -14,6 +17,15 @@ export function aiConfiguration(env={}){
 export async function currentDirectory(company,force=false,fetcher=fetch){
  const prior=cache.get(company);
  if(prior?.status==='live'&&Date.now()-prior.fetchedAt<3600000&&!force)return prior;
+ if(pendingDirectoryRefreshes.has(company))return pendingDirectoryRefreshes.get(company);
+ const lastAttempt=lastDirectoryAttempt.get(company);
+ if(prior&&lastAttempt!==undefined&&Date.now()-lastAttempt<DIRECTORY_REFRESH_INTERVAL_MS)return prior;
+ lastDirectoryAttempt.set(company,Date.now());
+ const pending=refreshDirectory(company,prior,fetcher);
+ pendingDirectoryRefreshes.set(company,pending);
+ try{return await pending;}finally{pendingDirectoryRefreshes.delete(company);}
+}
+async function refreshDirectory(company,prior,fetcher){
  const url=company==='NBPDCL'?'https://www.nbpdcl.co.in/frmHelplineNumbers.aspx':'https://www.sbpdcl.co.in/frmHelplineNumbers.aspx';
  try{
   const response=await fetcher(url,{headers:{'User-Agent':'BiharEnergyGrievanceWorkbench/1.0 (+https://bihar-energy-workbench.diptendudip.chatgpt.site)','Accept':'text/html'},signal:AbortSignal.timeout(10000)});
@@ -27,8 +39,8 @@ export async function currentDirectory(company,force=false,fetcher=fetch){
   // verification after a failed refresh. A later answer must not reuse the
   // previous successful cache entry as though that failure never happened.
   const records=(prior?.records??directory).map(o=>o.company===company?{...o,liveVerified:false}:o);
-  const entry={records,status:prior?'stale':'snapshot',fetchedAt:prior?.fetchedAt??null,source:url,verifiedCount:0,error:'directory_unavailable'};
-  if(prior)cache.set(company,entry);
+  const entry={records,status:prior?.fetchedAt!=null?'stale':'snapshot',fetchedAt:prior?.fetchedAt??null,source:url,verifiedCount:0,error:'directory_unavailable'};
+  cache.set(company,entry);
   return entry;
  }
 }
@@ -71,9 +83,9 @@ export async function handleAPI(request,env={},fetcher=fetch){
   // Public locality names only. Case names, phone numbers and household addresses
   // never reach a third-party geocoder through the case workflow.
   if(typeof body.locality!=='string'||body.locality.length<2||body.locality.length>120||/\d|@|https?:|\b(house|flat|apartment)\b|घर|मकान/i.test(body.locality)||typeof body.district!=='string')return json({error:'public_locality_required'},400);
-  const route=routeAddress({address:body.locality,district:body.district});
-  if(!route.company)return json({error:'bihar_district_required'},400);
-  const q=[body.locality,route.district,'Bihar, India'].join(', '),key=normalize(q);
+  const place=publicMapLocality(body.locality,body.district);
+  if(!place)return json({error:'public_locality_required'},400);
+  const q=[place.locality,place.district,'Bihar, India'].join(', '),key=normalize(q);
   if(geocache.has(key))return json(geocache.get(key));
   if(Date.now()-lastGeocode<1100)return json({error:'geocoder_rate_limit',retryAfter:2},429);
   lastGeocode=Date.now();
