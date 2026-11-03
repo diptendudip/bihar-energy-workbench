@@ -60,9 +60,16 @@ response=await handleAPI(req('/api/answer',{caseId:'REAL-GOVT-CASE',question:'Wh
 response=await handleAPI(req('/api/resolve',{address:'Simri',district:'Buxar'},{Origin:'https://other.test'}),{},failFetch);assert.equal(response.status,403);
 response=await handleAPI(req('/api/geocode',{locality:'House 12, School Lane',district:'Buxar'}),{},failFetch);assert.equal(response.status,400);
 response=await handleAPI(req('/api/geocode',{locality:'9876543210',district:'Buxar'}),{},failFetch);assert.equal(response.status,400);
+let privateLookupCalls=0;
+response=await handleAPI(req('/api/geocode',{locality:'Fictional Resident near Market Lane',district:'Buxar'}),{},async()=>{
+ privateLookupCalls++;
+ return Response.json([]);
+});
+assert.equal(response.status,400);
+assert.equal(privateLookupCalls,0);
 let requestedURL;
 const geoFetch=async(url)=>{requestedURL=String(url);return Response.json([{display_name:'Simri, Buxar, Bihar, India',lat:'25.6',lon:'84.1',address:{state:'Bihar'},osm_type:'node',osm_id:1},{display_name:'Simri, Jharkhand, India',lat:'24.6',lon:'85.1',address:{state:'Jharkhand'}}]);};
-response=await handleAPI(req('/api/geocode',{locality:'Simri',district:'Buxar'}),{},geoFetch);data=await response.json();assert.equal(data.locations.length,1);assert.equal(data.serviceAreaVerified,false);assert.ok(requestedURL.includes('countrycodes=in'));assert.ok(!requestedURL.includes('Sunita'));
+response=await handleAPI(req('/api/geocode',{locality:'सिमरी, बक्सर',district:'बक्सर'}),{},geoFetch);data=await response.json();assert.equal(data.locations.length,1);assert.equal(data.serviceAreaVerified,false);assert.ok(requestedURL.includes('countrycodes=in'));assert.equal(new URL(requestedURL).searchParams.get('q'),'Simri, Buxar, Bihar, India');assert.ok(!requestedURL.includes('Sunita'));
 
 const approvedEnv={GOVERNMENT_DEPLOYMENT_APPROVED:'true',GOVERNMENT_AI_ENDPOINT:'https://approved.example/chat',GOVERNMENT_AI_TOKEN:'TEST-ONLY-TOKEN',GOVERNMENT_AI_MODEL:'test-approved-model'};
 let modelCalls=0;
@@ -85,38 +92,61 @@ const directoryFixture=phone=>'<table>'+directory.filter(o=>o.company==='SBPDCL'
 const fixtureFetch=phone=>async()=>new Response(directoryFixture(phone));
 const resolveRequest=()=>req('/api/resolve',{address:'Simri',district:'Buxar',refresh:true});
 const answerRequest=()=>req('/api/answer',{caseId:'DEMO-1042',question:'Which office is responsible?'});
-response=await handleAPI(resolveRequest(),{},fixtureFetch('9999999999'));data=await response.json();
-assert.equal(data.directoryStatus,'live');assert.equal(data.liveVerified,true);
-assert.equal(data.candidates[0].phone,'9999999999');
-const lastCheckedAt=data.candidates[0].checkedAt,lastRefreshedAt=data.refreshedAt;
-assert.ok(Number.isFinite(Date.parse(lastCheckedAt)));
+const realNow=Date.now;
+let clock=realNow()+31_000;
+const advanceRefreshClock=()=>{clock+=31_000;};
+Date.now=()=>clock;
+try{
+ let directoryFetchCalls=0;
+ const countedFetch=async(...args)=>{
+  directoryFetchCalls++;
+  return fixtureFetch('9999999999')(...args);
+ };
+ const concurrent=await Promise.all([handleAPI(resolveRequest(),{},countedFetch),handleAPI(resolveRequest(),{},countedFetch)]);
+ assert.equal(directoryFetchCalls,1);
+ assert.equal((await concurrent[1].json()).directoryStatus,'live');
+ response=concurrent[0];data=await response.json();
+ assert.equal(data.directoryStatus,'live');assert.equal(data.liveVerified,true);
+ assert.equal(data.candidates[0].phone,'9999999999');
+ const lastCheckedAt=data.candidates[0].checkedAt,lastRefreshedAt=data.refreshedAt;
+ assert.ok(Number.isFinite(Date.parse(lastCheckedAt)));
+ await handleAPI(resolveRequest(),{},countedFetch);
+ assert.equal(directoryFetchCalls,1);
 
-response=await handleAPI(resolveRequest(),{},failFetch);data=await response.json();
-assert.equal(data.directoryStatus,'stale');assert.equal(data.liveVerified,false);
-assert.equal(data.candidates[0].phone,'9999999999');
-assert.equal(data.candidates[0].checkedAt,lastCheckedAt);
-assert.equal(data.refreshedAt,lastRefreshedAt);
-assert.ok([...data.candidates,...data.supervisors].every(o=>o.liveVerified===false));
 
-response=await handleAPI(answerRequest(),{},failFetch);data=await response.json();
-assert.equal(data.directoryStatus,'stale');assert.equal(data.liveVerified,false);
-assert.equal(data.route.candidates[0].phone,'9999999999');
-assert.equal(data.route.candidates[0].checkedAt,lastCheckedAt);
-assert.equal(data.sources.find(s=>s.id==='DIRECTORY').checkedAt,lastCheckedAt);
-assert.ok([...data.route.candidates,...data.route.supervisors].every(o=>o.liveVerified===false));
+ advanceRefreshClock();
+ response=await handleAPI(resolveRequest(),{},failFetch);data=await response.json();
+ assert.equal(data.directoryStatus,'stale');assert.equal(data.liveVerified,false);
+ assert.equal(data.candidates[0].phone,'9999999999');
+ assert.equal(data.candidates[0].checkedAt,lastCheckedAt);
+ assert.equal(data.refreshedAt,lastRefreshedAt);
+ assert.ok([...data.candidates,...data.supervisors].every(o=>o.liveVerified===false));
 
-// Answer lookup retries a stale source; recovery restores live verification and
-// uses the newly returned contact rather than the previously cached value.
-response=await handleAPI(answerRequest(),{},fixtureFetch('8888888888'));data=await response.json();
-assert.equal(data.directoryStatus,'live');assert.equal(data.liveVerified,true);
-assert.equal(data.route.candidates[0].phone,'8888888888');
-assert.equal(data.route.candidates[0].liveVerified,true);
-assert.equal(data.sources.find(s=>s.id==='DIRECTORY').checkedAt,data.route.candidates[0].checkedAt);
-response=await handleAPI(resolveRequest(),{},failFetch);data=await response.json();
-assert.equal(data.directoryStatus,'stale');assert.equal(data.liveVerified,false);
-response=await handleAPI(resolveRequest(),{},fixtureFetch('9999999999'));data=await response.json();
-assert.equal(data.directoryStatus,'live');assert.equal(data.liveVerified,true);
-assert.equal(data.candidates[0].phone,'9999999999');
+ response=await handleAPI(answerRequest(),{},failFetch);data=await response.json();
+ assert.equal(data.directoryStatus,'stale');assert.equal(data.liveVerified,false);
+ assert.equal(data.route.candidates[0].phone,'9999999999');
+ assert.equal(data.route.candidates[0].checkedAt,lastCheckedAt);
+ assert.equal(data.sources.find(s=>s.id==='DIRECTORY').checkedAt,lastCheckedAt);
+ assert.ok([...data.route.candidates,...data.route.supervisors].every(o=>o.liveVerified===false));
+
+ // Answer lookup retries a stale source; recovery restores live verification and
+ // uses the newly returned contact rather than the previously cached value.
+ advanceRefreshClock();
+ response=await handleAPI(answerRequest(),{},fixtureFetch('8888888888'));data=await response.json();
+ assert.equal(data.directoryStatus,'live');assert.equal(data.liveVerified,true);
+ assert.equal(data.route.candidates[0].phone,'8888888888');
+ assert.equal(data.route.candidates[0].liveVerified,true);
+ assert.equal(data.sources.find(s=>s.id==='DIRECTORY').checkedAt,data.route.candidates[0].checkedAt);
+ advanceRefreshClock();
+ response=await handleAPI(resolveRequest(),{},failFetch);data=await response.json();
+ assert.equal(data.directoryStatus,'stale');assert.equal(data.liveVerified,false);
+ advanceRefreshClock();
+ response=await handleAPI(resolveRequest(),{},fixtureFetch('9999999999'));data=await response.json();
+ assert.equal(data.directoryStatus,'live');assert.equal(data.liveVerified,true);
+ assert.equal(data.candidates[0].phone,'9999999999');
+}finally{
+ Date.now=realNow;
+}
 console.log('PASS: successful directory refresh, cached-source outage, historical dates, stale answers and recovery through both APIs.');
 console.log('PASS: jurisdiction ambiguity, Hindi queries, current contact refresh, source outages, geocoder privacy and state filtering, model approval gate, citation validation and human-control boundaries.');
 console.log('Live hosted model and government case-system integration remain unconfigured; test gateway responses are fixtures.');

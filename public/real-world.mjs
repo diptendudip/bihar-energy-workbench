@@ -41,6 +41,23 @@ function withinDistrict(o,d){
  const exclusions={Buxar:/^(ara|jagdishpur)/,Bhojpur:/buxar/,Nalanda:/nawada|rajauli/,Nawada:/biharsharif|ekangarsarai|rajgir/,Darbhanga:/jainagar|jhanjharpur|madhubani/,Madhubani:/benipur|darbhanga/,Gaya:/jehanabad/,Jehanabad:/gaya|sherghati|manpur/,Patna:/$^/,Muzaffarpur:/pupri|sheohar|sitamarhi/,Sitamarhi:/muzaffarpur|sheohar/,Sheohar:/muzaffarpur|pupri|sitamarhi/,Purnea:/barsoi|katihar/,Katihar:/purnea/,Khagaria:/barauni|begusarai/,Begusarai:/khagaria/,Siwan:/chapra|gopalganj|mirganj/,Saran:/gopalganj|maharajganj|mirganj|siwan/,Gopalganj:/chapra|maharajganj|siwan/,Samastipur:/hajipur|mahua/,Vaishali:/dalsinghsarai|rosera|samastipur/,Supaul:/madhepura|saharsa|simri|udaikishanganj/,Madhepura:/raghopur|saharsa|simri|supaul/,Saharsa:/madhepura|raghopur|supaul|udaikishanganj/};
  return !exclusions[d.en]?.test(div);
 }
+// Resolve a full input against public directory places and the demo's public blocks.
+export function publicMapLocality(locality, district){
+ const selected=districts.find(d=>normalize(d.en)===normalize(district));
+ if(!selected)return null;
+ const input=normalize(locality);
+ const districtName=normalize(selected.en);
+ const knownPlaces=[
+  selected.en,
+  ...cases.filter(c=>c.district.en===selected.en).map(c=>c.block.en),
+  ...directory.filter(o=>withinDistrict(o,selected)).map(postingLocality)
+ ];
+ const match=knownPlaces.find(place=>{
+  const key=normalize(place);
+  return key && (input===key || input===key+' '+districtName);
+ });
+ return match ? {locality:match,district:selected.en} : null;
+}
 export function routeAddress({address='',district='',kind='supply'}={},records=directory){
  const query=normalize(address),explicit=districts.find(d=>normalize(d.en)===normalize(district)||normalize(d.hi)===normalize(district));
  const mentioned=districts.filter(d=>hasPhrase(query,normalize(d.en)));

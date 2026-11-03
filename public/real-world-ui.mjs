@@ -1,4 +1,4 @@
-import {districts,directory,routeAddress,routeCase,lookupAnswer} from './real-world.mjs';
+import {districts,directory,routeAddress,routeCase,lookupAnswer,publicMapLocality} from './real-world.mjs';
 import {caseProfiles,actionPlans} from './officer-workflow.mjs';
 
 export function createRealWorldUI(ctx){
@@ -38,10 +38,24 @@ export function createRealWorldUI(ctx){
  function draft(c){openModal(t('Request for the service office','सेवा कार्यालय के लिए अनुरोध'),`<label for="office-draft">${t('Review and edit before using','उपयोग से पहले जाँचें और बदलें')}</label><textarea id="office-draft" rows="15" maxlength="5000">${H(draftText(c))}</textarea><div class="modal-actions">${button('close-modal',t('Close','बंद करें'),'','btn')}${button('rw-copy-draft',t('Copy draft','ड्राफ्ट कॉपी करें'),'','btn btn-primary')}</div>`,true);}
  async function map(c){
   const lookup=state().officeLookup,r=c?caseRoute(c):lookup?.result;
-  const locality=c?c.block.en:lookup?.address,district=c?c.district.en:lookup?.district||r?.district;
-  if(!locality||!district){toast(t('Choose a Bihar locality and district first.','पहले बिहार का स्थान और जिला चुनें।'));return;}
-  openModal(t('Locate the public locality','सार्वजनिक स्थान नक्शे पर देखें'),`<p class="modal-intro">${H(locality)}, ${H(district)} · ${t('This locates the locality, not the fictional household or an electricity service boundary.','यह स्थान का नक्शा है, काल्पनिक घर या बिजली कार्यालय की सीमा का नहीं।')}</p><p role="status">${t('Finding map matches…','नक्शे पर मिलान खोज रहे हैं…')}</p>`);
-  try{const result=await call('/api/geocode',{locality,district});const list=result.locations??[];state().mapChoices=list;state().mapForCase=c?.id??null;ctx.persist();openModal(t('Choose the map location','नक्शे का स्थान चुनें'),`<p class="modal-intro">${t('Select the place that matches. Location does not confirm the electricity service area.','सही स्थान चुनें। इससे बिजली कार्यालय के सेवा क्षेत्र की पुष्टि नहीं होती।')}</p>${list.length?list.map((l,i)=>`<button class="map-choice" data-action="rw-map-choice" data-index="${i}">${H(l.label)} →</button>`).join(''):`<p>${t('No matching place was returned. Try a more specific public locality.','मेल खाता स्थान नहीं मिला। सार्वजनिक स्थान का और स्पष्ट नाम लिखें।')}</p>`}<p class="field-help">© OpenStreetMap contributors · Nominatim</p><a class="text-btn" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(locality+', '+district+', Bihar, India')}" target="_blank" rel="noopener noreferrer">${t('Open map search','नक्शे की खोज खोलें')} ↗</a>`);}catch{openModal(t('Map search','नक्शे की खोज'),`<p>${t('The map service is unavailable. You can open the locality search directly.','नक्शे की सेवा अभी उपलब्ध नहीं है। स्थान की खोज सीधे खोल सकते हैं।')}</p><a class="btn" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(locality+', '+district+', Bihar, India')}" target="_blank" rel="noopener noreferrer">${t('Open map search','नक्शे की खोज खोलें')} ↗</a>`);}
+  const place=publicMapLocality(c?c.block.en:lookup?.address,c?c.district.en:lookup?.district||r?.district);
+  if(!place){
+   toast(t('Enter a listed locality and its district to open the map.','नक्शा खोलने के लिए सूची में दर्ज स्थान और उसका जिला लिखें।'));
+   return;
+  }
+  openModal(t('Locate the public locality','सार्वजनिक स्थान नक्शे पर देखें'),
+   `<p class="modal-intro">${H(place.locality)}, ${H(place.district)}</p><p role="status">${t('Finding map matches…','नक्शे पर मिलान खोज रहे हैं…')}</p>`);
+  try{
+   const result=await call('/api/geocode',place);
+   const list=result.locations??[];
+   state().mapChoices=list;
+   state().mapForCase=c?.id??null;
+   ctx.persist();
+   openModal(t('Choose the map location','नक्शे का स्थान चुनें'),
+    `<p class="modal-intro">${t('Select the place that matches. Confirm the electricity service area separately.','सही स्थान चुनें। बिजली सेवा क्षेत्र की पुष्टि अलग से करें।')}</p>${list.length?list.map((l,i)=>`<button class="map-choice" data-action="rw-map-choice" data-index="${i}">${H(l.label)} →</button>`).join(''):`<p>${t('No matching place was returned. Try another listed locality.','स्थान का मिलान नहीं मिला। सूची में दर्ज कोई दूसरा स्थान आज़माएँ।')}</p>`}<p class="field-help">© OpenStreetMap contributors · Nominatim</p>`);
+  }catch{
+   openModal(t('Map search','नक्शे की खोज'),`<p>${t('The map service is unavailable. Try again shortly.','नक्शे की सेवा अभी उपलब्ध नहीं है। थोड़ी देर बाद फिर कोशिश करें।')}</p>`);
+  }
  }
  async function click(action,data){
   if(!action.startsWith('rw-'))return false;
