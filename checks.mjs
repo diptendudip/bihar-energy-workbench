@@ -253,7 +253,7 @@ for(const view of ['offices','policies','reviews','insights','workbench']){
  await click('nav',{view});assert.ok(app.innerHTML.includes('<main'));
  assert.ok(!app.innerHTML.includes('undefined'));
 }
-await click('nav',{view:'insights'});requireText('29.0%');requireText('not pilot results');
+await click('nav',{view:'insights'});assert.ok(!app.innerHTML.includes('29.0%'));requireText('not pilot results');
 for(const c of cases){
  await click('case',{id:c.id});
  const source=sourceStories.find(s=>s.id===c.sourceId);

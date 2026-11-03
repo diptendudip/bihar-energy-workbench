@@ -29,7 +29,4 @@ for o in offices:
  k=(o['company'],o['division'],o['posting'],o['role'],o['phone'])
  if k not in seen:unique.append(o);seen.add(k)
 (root/'public'/'official-directory.mjs').write_text('// Official public contact-directory snapshot. Regenerate from evidence snapshots; never invent contacts.\nexport const directory = '+json.dumps(unique,ensure_ascii=False,separators=(',',':'))+';\n')
-(root/'scripts'/'build-directory.py').write_text(Path(__file__).read_text().replace("root=Path(__file__).resolve().parents[1]","root=Path(__file__).resolve().parents[1]"))
 print('Imported',len(unique),'office contacts')
-for name in ['Simri','Dumraon','Kanti','Rupouli','Bahadurpur','Tekari','Rajgir','Danapur']:
- print(name,[(o['company'],o['division'],o['posting'],o['role'],o['phone']) for o in unique if name.lower() in (o['posting']+' '+o['role']).lower()][:6])
